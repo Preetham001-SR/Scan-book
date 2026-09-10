@@ -1,0 +1,58 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Bill {
+  id             String      @id @default(uuid())
+  billNumber     String?
+  date           DateTime?
+  customerName   String?
+  customerPhone  String?
+  customerAddress String?
+  
+  items          BillItem[]
+  
+  subtotal       Float       @default(0)
+  discount       Float       @default(0)
+  tax            Float       @default(0)
+  total          Float       @default(0)
+  paymentMethod  String?
+  notes          String?
+  
+  originalImage  String?
+  ocrRawText     String?
+  status         String      @default("Needs Verification") // Processing, Needs Verification, Verified, Exported
+  
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+}
+
+model BillItem {
+  id        String  @id @default(uuid())
+  itemName  String?
+  quantity  Float?
+  unit      String?
+  rate      Float?
+  amount    Float?
+  
+  bill      Bill    @relation(fields: [billId], references: [id], onDelete: Cascade)
+  billId    String
+}
+
+model Settings {
+  id                 String  @id @default("default")
+  businessName       String?
+  businessAddress    String?
+  phone              String?
+  email              String?
+  gstin              String?
+  currency           String  @default("₹")
+  invoicePrefix      String?
+  defaultTaxPercent  Float   @default(0)
+  logoUrl            String?
+}
