@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash, Check, Loader2, ArrowLeft } from "lucide-react";
+import { Plus, Trash, Check, Loader2, ArrowLeft, AlertCircle } from "lucide-react";
 import Image from "next/image";
 import { format } from "date-fns";
 
@@ -16,6 +16,13 @@ export default function VerifyForm({ initialData }: { initialData: Record<string
   const [bill, setBill] = useState(initialData);
   const [items, setItems] = useState<Record<string, any>[]>(initialData.items || []);
   const [isSaving, setIsSaving] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const safeFloat = (val: any) => {
+    const num = parseFloat(val);
+    if (isNaN(num)) return 0;
+    return Math.round(num * 100) / 100;
+  };
 
   const handleBillChange = (field: string, value: string | number | Date) => {
     setBill({ ...bill, [field]: value });
@@ -27,9 +34,9 @@ export default function VerifyForm({ initialData }: { initialData: Record<string
     
     // Auto calculate amount if quantity and rate change
     if (field === 'quantity' || field === 'rate') {
-      const qty = parseFloat(newItems[index].quantity || 0);
-      const rate = parseFloat(newItems[index].rate || 0);
-      newItems[index].amount = qty * rate;
+      const qty = safeFloat(newItems[index].quantity);
+      const rate = safeFloat(newItems[index].rate);
+      newItems[index].amount = safeFloat(qty * rate);
     }
     
     setItems(newItems);
@@ -47,16 +54,17 @@ export default function VerifyForm({ initialData }: { initialData: Record<string
   };
 
   const recalculateTotals = (currentItems: Record<string, any>[]) => {
-    const subtotal = currentItems.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
-    const tax = parseFloat(bill.tax || 0);
-    const discount = parseFloat(bill.discount || 0);
-    const total = subtotal + tax - discount;
+    const subtotal = currentItems.reduce((sum, item) => sum + safeFloat(item.amount), 0);
+    const tax = safeFloat(bill.tax);
+    const discount = safeFloat(bill.discount);
+    const total = safeFloat(subtotal + tax - discount);
     
-    setBill({ ...bill, subtotal, total });
+    setBill({ ...bill, subtotal: safeFloat(subtotal), total });
   };
 
   const handleSave = async () => {
     setIsSaving(true);
+    setErrorMsg("");
     try {
       const response = await fetch(`/api/bills/${bill.id}`, {
         method: "PUT",
@@ -73,7 +81,7 @@ export default function VerifyForm({ initialData }: { initialData: Record<string
       router.push("/");
     } catch (error) {
       console.error("Error saving bill:", error);
-      alert("Failed to save bill");
+      setErrorMsg("Failed to save the verified bill. Please try again.");
     } finally {
       setIsSaving(false);
     }
@@ -82,14 +90,25 @@ export default function VerifyForm({ initialData }: { initialData: Record<string
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <div className="flex flex-col space-y-4">
-        <Button variant="outline" className="w-fit" onClick={() => router.push("/")}>
-          <ArrowLeft className="mr-2 h-4 w-4" /> Back to Dashboard
-        </Button>
+        <div className="flex justify-between items-center">
+          <Button variant="outline" className="w-fit" onClick={() => router.push("/")}>
+            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Dashboard
+          </Button>
+        </div>
+        
+        {errorMsg && (
+          <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-md flex items-start">
+            <AlertCircle className="h-5 w-5 text-red-500 mr-2 flex-shrink-0 mt-0.5" />
+            <p className="text-red-700 text-sm">{errorMsg}</p>
+          </div>
+        )}
+
         <Card className="flex-1">
           <CardHeader>
             <CardTitle>Original Image</CardTitle>
           </CardHeader>
           <CardContent>
+
             {bill.originalImage ? (
               <div className="relative w-full aspect-[3/4]">
                 <Image 
@@ -241,7 +260,10 @@ export default function VerifyForm({ initialData }: { initialData: Record<string
                   value={bill.tax || 0} 
                   onChange={(e) => {
                     handleBillChange("tax", e.target.value);
-                    setBill((prev: Record<string, any>) => ({...prev, total: prev.subtotal + parseFloat(e.target.value || "0") - prev.discount}));
+                    setBill((prev: Record<string, any>) => ({
+                      ...prev, 
+                      total: safeFloat(safeFloat(prev.subtotal) + safeFloat(e.target.value || "0") - safeFloat(prev.discount))
+                    }));
                   }} 
                 />
               </div>

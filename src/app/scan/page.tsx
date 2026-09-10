@@ -5,7 +5,7 @@ import Webcam from "react-webcam";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Camera, Upload, Check, X, Loader2 } from "lucide-react";
+import { Camera, Upload, Check, X, Loader2, AlertCircle } from "lucide-react";
 import Image from "next/image";
 import ReactCrop, { Crop, PixelCrop } from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
@@ -17,6 +17,7 @@ export default function ScanPage() {
   
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
   const [crop, setCrop] = useState<Crop>();
   const [completedCrop, setCompletedCrop] = useState<PixelCrop>();
   const imgRef = useRef<HTMLImageElement>(null);
@@ -90,6 +91,7 @@ export default function ScanPage() {
     if (!imageSrc || !imgRef.current) return;
     
     setIsProcessing(true);
+    setErrorMsg("");
     
     try {
       // If crop is extremely small or not defined, just use the full image. 
@@ -105,18 +107,18 @@ export default function ScanPage() {
         body: formData,
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to extract bill");
-      }
-
       const data = await response.json();
       
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to extract bill");
+      }
+
       if (data.success && data.billId) {
         router.push(`/verify/${data.billId}`);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error processing image:", error);
-      alert("Failed to process image. Please try again.");
+      setErrorMsg(error.message || "Failed to process image. Please try again.");
     } finally {
       setIsProcessing(false);
     }
@@ -128,7 +130,13 @@ export default function ScanPage() {
         <h2 className="text-3xl font-bold tracking-tight">Scan Bill</h2>
       </div>
 
-      <div className="flex justify-center">
+      <div className="flex flex-col items-center gap-4 w-full">
+        {errorMsg && (
+          <div className="w-full max-w-3xl bg-red-50 border-l-4 border-red-500 p-4 rounded-md flex items-start">
+            <AlertCircle className="h-5 w-5 text-red-500 mr-2 flex-shrink-0 mt-0.5" />
+            <p className="text-red-700 text-sm">{errorMsg}</p>
+          </div>
+        )}
         <Card className="w-full max-w-3xl">
           <CardHeader>
             <CardTitle>{imageSrc ? "Review & Crop" : "Capture Image"}</CardTitle>

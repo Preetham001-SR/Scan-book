@@ -5,6 +5,9 @@ import path from "path";
 import { v4 as uuidv4 } from "uuid";
 import prisma from "@/lib/prisma";
 
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"];
+
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
@@ -13,6 +16,21 @@ export async function POST(req: NextRequest) {
     if (!file) {
       return NextResponse.json(
         { error: "No image provided" },
+        { status: 400 }
+      );
+    }
+
+    // Validation
+    if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+      return NextResponse.json(
+        { error: "Invalid file type. Only JPEG, PNG, and WebP are allowed." },
+        { status: 400 }
+      );
+    }
+
+    if (file.size > MAX_FILE_SIZE) {
+      return NextResponse.json(
+        { error: "File size exceeds 5MB limit." },
         { status: 400 }
       );
     }
